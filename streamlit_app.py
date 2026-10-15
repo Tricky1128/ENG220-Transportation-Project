@@ -38,6 +38,28 @@ df = pd.DataFrame(
     }
 )
 
+# Calculate total wildlife collisions for display
+df["total_wildlife"] = df["elk_collisions_yr"] + df["deer_collisions_yr"]
+
+# Quick Summary Key Metrics Row
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric(
+        "Max Traffic Segment", "Cuba Village Center", "7,100 Vehicles/Day"
+    )
+with col2:
+    st.metric(
+        "Peak Wildlife Hotspot",
+        "Wildlife Hotspot North 1",
+        "45 Collisions/Year",
+    )
+with col3:
+    st.metric("Max Crash Severity", "Wildlife Hotspot North 1", "9.2 / 10 Index")
+with col4:
+    st.metric("Peak Freight Share", "San Juan County Line", "26.0% Trucks")
+
+st.markdown("---")
+
 # Sidebar Controls
 st.sidebar.header("Dashboard Controls")
 show_table = st.sidebar.checkbox("Show Raw Data Table", value=False)
@@ -145,7 +167,7 @@ fig.add_vrect(
 # 7. Layout & Styling Customization
 fig.update_layout(
     template="plotly_white",
-    height=700,
+    height=650,
     hovermode="x unified",
     barmode="group",
     legend=dict(
@@ -170,6 +192,21 @@ fig.update_yaxes(
 
 # Render Chart in Streamlit
 st.plotly_chart(fig, use_container_width=True)
+
+# Expandable Data Explanation Section
+with st.expander("📖 Guide to Understanding the Data & Metrics"):
+    st.markdown(
+        """
+        ### Corridor Variables & Engineering Definitions
+        * **Milepost (MP) & Segment Name**: Specific milepost markers along U.S. Route 550 north of Cuba, NM, dividing the corridor into distinct functional and geographic segments.
+        * **AADT Total (Annual Average Daily Traffic)**: The estimated average daily traffic volume (cars and commercial vehicles combined). Note how volume peaks in village center areas (MP 63.0) where local commuter traffic intersects with highway travelers.
+        * **Elk & Deer Collisions / Year**: Annual average reported wildlife-vehicle collisions. Notice the severe concentration in northern rural segments (MP 72.5 to 82.0) where higher speed limits (65 mph) coincide with migratory corridors.
+        * **Freight Truck Traffic (%)**: The share of total daily traffic composed of heavy commercial freight trucks. High freight percentages compound crash severity due to vehicle weight and braking dynamics.
+        * **Speed Limit (mph)**: The posted legal speed limit for each segment, dropping significantly inside Cuba village limits (35–45 mph) and rising to 65 mph in open rural areas.
+        * **Crash Severity Index (1-10)**: A composite score factoring in injury severity, property damage extent, and fatality risk. Scores scale from 1 (minor property damage) to 10 (catastrophic or fatal incidents).
+        * **Nighttime (%)**: The proportion of collisions or traffic occurring during hours of darkness, which heavily influences driver reaction times and wildlife visibility.
+        """
+    )
 
 # Conditionally display raw data table
 if show_table:
