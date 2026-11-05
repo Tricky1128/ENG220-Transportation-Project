@@ -191,24 +191,6 @@ WC-10,Underpass,72.99,Phase 3
 WC-12,Underpass,74.85,Phase 3
 WC-16,Overpass,76.98,Phase 4
 """,
-    "animal_types_2025_cuba_vs_sandoval.csv": """animal,people,area
-Elk,2,Cuba village
-Bear,0,Cuba village
-Cattle/Cow,0,Cuba village
-Deer,0,Cuba village
-Horse,0,Cuba village
-Small Domestic Animal,0,Cuba village
-Small Game Animal,0,Cuba village
-Missing Subanalysis Data,0,Cuba village
-Elk,72,Sandoval County
-Deer,29,Sandoval County
-Small Domestic Animal,20,Sandoval County
-Cattle/Cow,15,Sandoval County
-Small Game Animal,14,Sandoval County
-Bear,6,Sandoval County
-Horse,5,Sandoval County
-Missing Subanalysis Data,6,Sandoval County
-""",
 }
 
 
@@ -220,7 +202,6 @@ cuba_year = load("cuba_crashes_by_year.csv")
 cuba_event = load("cuba_first_harmful_event.csv")
 cuba_month = load("cuba_crashes_by_month.csv")
 sand_year = load("sandoval_crashes_by_year.csv")
-animal_types = load("animal_types_2025_cuba_vs_sandoval.csv")
 sand_event = load("sandoval_first_harmful_event.csv")
 
 tab1, tab2, tab_us550, tab3 = st.tabs(
@@ -300,34 +281,10 @@ with tab2:
     st.info(
         "How to read this: Cuba's share was higher than the county's in every year, "
         "but Cuba had only 1 to 3 animal crashes a year, so one crash moves its bar a lot. "
-        "The county includes Rio Rancho and Bernalillo, so it is a baseline and not the "
-        "US 550 corridor. The data does not say which road each crash was on."
-    )
-
-    st.subheader("People in animal crashes by animal type, 2025: Cuba village and Sandoval County")
-    order = (
-        animal_types[animal_types.area == "Sandoval County"]
-        .sort_values("people")["animal"]
-        .tolist()
-    )
-    fig4 = px.bar(
-        animal_types,
-        x="people",
-        y="animal",
-        color="area",
-        orientation="h",
-        barmode="group",
-        text_auto=True,
-        category_orders={"animal": order},
-        labels={"people": "People involved", "animal": "Animal", "area": ""},
-    )
-    fig4.update_layout(bargap=0.4)
-    st.plotly_chart(fig4)
-    st.caption(
-        "2025 only. This counts people in the crashes, not the number of crashes, because "
-        "that is how the UNM table is built. Cuba had one animal crash with two people in it, "
-        "and it was elk, so its bars are tiny next to the county's 167 people. The county "
-        "includes Rio Rancho and Bernalillo."
+        "Sandoval County is mostly urban. Rio Rancho alone was about 64% of county crashes "
+        "from 2021 to 2025, and 87% of county crashes in 2025 were on urban roads. So this "
+        "compares a rural village with a mostly suburban county, and part of the gap may be "
+        "rural versus urban driving. The data does not say which road each crash was on."
     )
 
     st.subheader("Cuba village by animal type")
@@ -431,6 +388,8 @@ with tab3:
     st.markdown(
         "- Cuba numbers cover the village only, not US 550 north of town.\n"
         "- Counts are small, so trends can change with one or two crashes.\n"
+        "- The county comparison is mostly Rio Rancho and other urban roads, so it is a rough "
+        "baseline, not a like-for-like comparison.\n"
         "- The data covers reported crashes with a death, an injury, or at least $500 in damage.\n"
         "- The UNM data does not give crash locations, so the Cuba and county charts cannot be "
         "mapped by milepost. The US 550 tab uses the scoping report's counts by phase instead."
