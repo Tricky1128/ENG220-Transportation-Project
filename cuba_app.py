@@ -184,7 +184,6 @@ Phase 4,MP 75.62 to 80.64,5.02,52,70,122,24.3
     "us550_planned_structures.csv": """structure,type,milepost,phase
 WC-01,Overpass,65.97,Phase 1
 WC-04,Underpass,67.55,Phase 1
-WC-05,Overpass,68.46,Phase 5
 WC-07,Overpass,70.28,Phase 2
 WC-08,Underpass,71.81,Phase 2
 WC-10,Underpass,72.99,Phase 3
@@ -356,8 +355,8 @@ with tab_us550:
     st.subheader("Planned wildlife crossings (from the scoping report)")
     st.dataframe(structures, hide_index=True)
     st.caption(
-        "Phase 5 is optional in the report. NMDOT notes it is a low crossing-activity area "
-        "and an overpass there may not be very effective."
+        "Seven crossings in four phases. The report also lists one optional overpass "
+        "(Phase 5) near NM-96, which is left out here."
     )
 
     st.info(
