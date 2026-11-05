@@ -285,6 +285,16 @@ with tab2:
         "US 550 corridor. The data does not say which road each crash was on."
     )
 
+    st.subheader("Cuba village by animal type")
+    st.markdown(
+        "The UNM table that splits animal crashes by type only covers one year in the file "
+        "I used, 2025. In 2025 Cuba had 1 animal crash, and it involved **elk**. Two people "
+        "were in it, with no apparent injuries. Every other animal type was zero. "
+        "One crash is too few to draw a conclusion, so the elk and deer breakdown on the "
+        "next tab, which covers the US 550 hotspot north of Cuba, is the better source "
+        "for animal types."
+    )
+
 
 # ---------- Tab: US 550 wildlife corridor ----------
 with tab_us550:
@@ -323,6 +333,22 @@ with tab_us550:
         f"({int(ph.elk_crashes.sum())} elk, {int(ph.deer_crashes.sum())} mule deer). "
         "Crashes per mile are close to even across the four phases, about 24 to 27 per mile, "
         "so the whole stretch is a hotspot and not one single spot."
+    )
+
+    st.subheader("Which animals: elk vs mule deer")
+    sp = pd.DataFrame(
+        {
+            "Animal": ["Elk", "Mule deer"],
+            "Crashes": [int(ph.elk_crashes.sum()), int(ph.deer_crashes.sum())],
+        }
+    )
+    sp["Label"] = sp["Crashes"].astype(str) + " (" + (100 * sp["Crashes"] / sp["Crashes"].sum()).round(1).astype(str) + "%)"
+    fig7 = px.bar(sp, x="Animal", y="Crashes", text="Label")
+    fig7.update_layout(bargap=0.6)
+    st.plotly_chart(fig7)
+    st.caption(
+        "Reported elk and mule deer crashes, MP 64.93 to 80.64, 2008 to 2021. "
+        "Other animals such as bears or cougars are not in these tables."
     )
 
     st.subheader("Planned wildlife crossings (from the scoping report)")
