@@ -191,15 +191,23 @@ WC-10,Underpass,72.99,Phase 3
 WC-12,Underpass,74.85,Phase 3
 WC-16,Overpass,76.98,Phase 4
 """,
-    "sandoval_animal_crashes_by_type_2025.csv": """animal,people_involved_2025
-Elk,72
-Deer,29
-Small Domestic Animal,20
-Cattle/Cow,15
-Small Game Animal,14
-Bear,6
-Missing Subanalysis Data,6
-Horse,5
+    "animal_types_2025_cuba_vs_sandoval.csv": """animal,people,area
+Elk,2,Cuba village
+Bear,0,Cuba village
+Cattle/Cow,0,Cuba village
+Deer,0,Cuba village
+Horse,0,Cuba village
+Small Domestic Animal,0,Cuba village
+Small Game Animal,0,Cuba village
+Missing Subanalysis Data,0,Cuba village
+Elk,72,Sandoval County
+Deer,29,Sandoval County
+Small Domestic Animal,20,Sandoval County
+Cattle/Cow,15,Sandoval County
+Small Game Animal,14,Sandoval County
+Bear,6,Sandoval County
+Horse,5,Sandoval County
+Missing Subanalysis Data,6,Sandoval County
 """,
 }
 
@@ -212,7 +220,7 @@ cuba_year = load("cuba_crashes_by_year.csv")
 cuba_event = load("cuba_first_harmful_event.csv")
 cuba_month = load("cuba_crashes_by_month.csv")
 sand_year = load("sandoval_crashes_by_year.csv")
-sand_animal = load("sandoval_animal_crashes_by_type_2025.csv")
+animal_types = load("animal_types_2025_cuba_vs_sandoval.csv")
 sand_event = load("sandoval_first_harmful_event.csv")
 
 tab1, tab2, tab_us550, tab3 = st.tabs(
@@ -296,20 +304,30 @@ with tab2:
         "US 550 corridor. The data does not say which road each crash was on."
     )
 
-    st.subheader("Sandoval County: people in animal crashes by animal type, 2025")
+    st.subheader("People in animal crashes by animal type, 2025: Cuba village and Sandoval County")
+    order = (
+        animal_types[animal_types.area == "Sandoval County"]
+        .sort_values("people")["animal"]
+        .tolist()
+    )
     fig4 = px.bar(
-        sand_animal.sort_values("people_involved_2025"),
-        x="people_involved_2025",
+        animal_types,
+        x="people",
         y="animal",
+        color="area",
         orientation="h",
-        labels={"people_involved_2025": "People involved", "animal": "Animal"},
+        barmode="group",
+        text_auto=True,
+        category_orders={"animal": order},
+        labels={"people": "People involved", "animal": "Animal", "area": ""},
     )
     fig4.update_layout(bargap=0.4)
     st.plotly_chart(fig4)
     st.caption(
-        "This is the whole county, not just Cuba, and it covers 2025 only. It counts people "
-        "in the crashes, not the number of crashes, because that is how the UNM table is built. "
-        "It is the only UNM table that splits animal crashes by animal type."
+        "2025 only. This counts people in the crashes, not the number of crashes, because "
+        "that is how the UNM table is built. Cuba had one animal crash with two people in it, "
+        "and it was elk, so its bars are tiny next to the county's 167 people. The county "
+        "includes Rio Rancho and Bernalillo."
     )
 
     st.subheader("Cuba village by animal type")
