@@ -1,0 +1,36 @@
+first_harmful_event,year,crashes
+Collision with Animal,2021,74
+Collision with Fixed Object,2021,262
+Collision with Motor Vehicle,2021,1392
+Collision with Other Non-Fixed Object,2021,49
+Collision with Person,2021,26
+Pedestrian,2021,13
+Non-Collision,2021,82
+Collision with Animal,2022,66
+Collision with Fixed Object,2022,301
+Collision with Motor Vehicle,2022,1488
+Collision with Other Non-Fixed Object,2022,55
+Collision with Person,2022,21
+Pedestrian,2022,9
+Non-Collision,2022,77
+Collision with Animal,2023,75
+Collision with Fixed Object,2023,292
+Collision with Motor Vehicle,2023,1473
+Collision with Other Non-Fixed Object,2023,44
+Collision with Person,2023,40
+Pedestrian,2023,25
+Non-Collision,2023,86
+Collision with Animal,2024,80
+Collision with Fixed Object,2024,291
+Collision with Motor Vehicle,2024,1680
+Collision with Other Non-Fixed Object,2024,53
+Collision with Person,2024,28
+Pedestrian,2024,12
+Non-Collision,2024,104
+Collision with Animal,2025,78
+Collision with Fixed Object,2025,377
+Collision with Motor Vehicle,2025,1948
+Collision with Other Non-Fixed Object,2025,84
+Collision with Person,2025,30
+Pedestrian,2025,14
+Non-Collision,2025,67
