@@ -15,9 +15,28 @@ st.write(
 )
 
 
+def find_file(name):
+    # Finds the file even if the download added a suffix like " (1)"
+    stem = name.replace(".csv", "")
+    matches = sorted(DATA.glob(stem + "*.csv")) if DATA.exists() else []
+    if not matches:
+        st.error(f"Could not find {name} in the data folder.")
+        st.write("Data folder exists:", DATA.exists())
+        if DATA.exists():
+            st.write("Files found in data folder:", [p.name for p in DATA.iterdir()])
+        else:
+            st.write("Files found next to the app:", [p.name for p in DATA.parent.iterdir()])
+        st.stop()
+    return matches[-1]
+
+
 @st.cache_data
+def read_csv_cached(path):
+    return pd.read_csv(path)
+
+
 def load(name):
-    return pd.read_csv(DATA / name)
+    return read_csv_cached(find_file(name))
 
 
 cuba_year = load("cuba_crashes_by_year.csv")
