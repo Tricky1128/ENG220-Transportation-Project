@@ -175,15 +175,21 @@ Collision with Person,2025,30
 Pedestrian,2025,14
 Non-Collision,2025,67
 """,
-    "sandoval_animal_crashes_by_type_2025.csv": """animal,people_involved_2025
-Elk,72
-Deer,29
-Small Domestic Animal,20
-Cattle/Cow,15
-Small Game Animal,14
-Bear,6
-Missing Subanalysis Data,6
-Horse,5
+    "us550_phase_crashes.csv": """phase,mileposts,miles,deer_crashes,elk_crashes,total_crashes,crashes_per_mile
+Phase 1,MP 64.93 to 69.14,4.21,42,73,115,27.3
+Phase 2,MP 69.14 to 72.98,3.84,38,60,98,25.5
+Phase 3,MP 72.98 to 75.62,2.64,33,31,64,24.2
+Phase 4,MP 75.62 to 80.64,5.02,52,70,122,24.3
+""",
+    "us550_planned_structures.csv": """structure,type,milepost,phase
+WC-01,Overpass,65.97,Phase 1
+WC-04,Underpass,67.55,Phase 1
+WC-05,Overpass,68.46,Phase 5
+WC-07,Overpass,70.28,Phase 2
+WC-08,Underpass,71.81,Phase 2
+WC-10,Underpass,72.99,Phase 3
+WC-12,Underpass,74.85,Phase 3
+WC-16,Overpass,76.98,Phase 4
 """,
 }
 
@@ -197,9 +203,10 @@ cuba_event = load("cuba_first_harmful_event.csv")
 cuba_month = load("cuba_crashes_by_month.csv")
 sand_year = load("sandoval_crashes_by_year.csv")
 sand_event = load("sandoval_first_harmful_event.csv")
-sand_animal = load("sandoval_animal_crashes_by_type_2025.csv")
 
-tab1, tab2, tab3 = st.tabs(["Cuba crashes", "Animal crashes", "About the data"])
+tab1, tab2, tab_us550, tab3 = st.tabs(
+    ["Cuba crashes", "Animal crashes", "US 550 wildlife corridor", "About the data"]
+)
 
 # ---------- Tab 1: Cuba crashes ----------
 with tab1:
@@ -230,44 +237,113 @@ with tab1:
     fig2 = px.bar(m, x="month", y="crashes", labels={"month": "Month", "crashes": "Crashes"})
     fig2.update_layout(bargap=0.5)
     st.plotly_chart(fig2)
+    st.caption(
+        f"Only {int(m.crashes.sum())} crashes over five years, so this pattern is weak. "
+        "One crash can move a bar. Treat it as a rough look, not a seasonal trend."
+    )
 
 # ---------- Tab 2: Animal crashes ----------
 with tab2:
-    def animal_share(event_df, year_df):
-        animal = event_df[event_df.first_harmful_event == "Collision with Animal"]["crashes"].sum()
-        total = year_df[year_df.year >= 2021]["total"].sum()
-        return int(animal), int(total), 100 * animal / total
+    def animal_by_year(event_df, year_df):
+        a = event_df[event_df.first_harmful_event == "Collision with Animal"][["year", "crashes"]]
+        t = year_df[year_df.year >= 2021][["year", "total"]]
+        out = a.merge(t, on="year")
+        out["percent"] = 100 * out["crashes"] / out["total"]
+        return out
 
-    c_a, c_t, c_p = animal_share(cuba_event, cuba_year)
-    s_a, s_t, s_p = animal_share(sand_event, sand_year)
+    cu = animal_by_year(cuba_event, cuba_year)
+    cu["Area"] = "Cuba village"
+    sa = animal_by_year(sand_event, sand_year)
+    sa["Area"] = "Sandoval County"
+    both = pd.concat([cu, sa])
 
-    st.subheader("Share of crashes that started with hitting an animal, 2021 to 2025")
-    share = pd.DataFrame(
-        {
-            "Area": ["Cuba village", "Sandoval County"],
-            "Percent of crashes": [c_p, s_p],
-        }
+    st.subheader("Share of crashes that started with hitting an animal, by year")
+    fig3 = px.bar(
+        both,
+        x="year",
+        y="percent",
+        color="Area",
+        barmode="group",
+        text_auto=".1f",
+        labels={"percent": "Percent of all crashes", "year": "Year"},
     )
-    fig3 = px.bar(share, x="Area", y="Percent of crashes", text_auto=".1f")
-    fig3.update_layout(bargap=0.6)
+    fig3.update_xaxes(type="category")
+    fig3.update_layout(bargap=0.4)
     st.plotly_chart(fig3)
+
+    cu_a, cu_t = int(cu.crashes.sum()), int(cu.total.sum())
+    sa_a, sa_t = int(sa.crashes.sum()), int(sa.total.sum())
     st.caption(
-        f"Cuba: {c_a} of {c_t} crashes. Sandoval County: {s_a} of {s_t} crashes. "
-        "The county includes Rio Rancho and Bernalillo, so it is a baseline and not "
-        "the US 550 corridor."
+        f"2021 to 2025: Cuba had {cu_a} animal crashes out of {cu_t} total "
+        f"({100 * cu_a / cu_t:.1f}%). Sandoval County had {sa_a} out of {sa_t:,} "
+        f"({100 * sa_a / sa_t:.1f}%)."
+    )
+    st.info(
+        "How to read this: Cuba's share was higher than the county's in every year, "
+        "but Cuba had only 1 to 3 animal crashes a year, so one crash moves its bar a lot. "
+        "The county includes Rio Rancho and Bernalillo, so it is a baseline and not the "
+        "US 550 corridor. The data does not say which road each crash was on."
     )
 
-    st.subheader("Sandoval County: people in animal crashes by animal type, 2025")
-    fig4 = px.bar(
-        sand_animal.sort_values("people_involved_2025"),
-        x="people_involved_2025",
-        y="animal",
-        orientation="h",
-        labels={"people_involved_2025": "People involved", "animal": "Animal"},
+
+# ---------- Tab: US 550 wildlife corridor ----------
+with tab_us550:
+    ph = load("us550_phase_crashes.csv")
+    structures = load("us550_planned_structures.csv")
+
+    st.subheader("Reported elk and deer crashes on US 550 north of Cuba, 2008 to 2021")
+    st.write(
+        "NMDOT's scoping report split the wildlife hotspot (MP 64.93 to MP 80.64) into "
+        "four building phases. These are the reported crashes in each phase."
     )
-    fig4.update_layout(bargap=0.4)
-    st.plotly_chart(fig4)
-    st.caption("This table counts people, not crashes, and covers 2025 only.")
+    ph["label"] = ph["phase"] + " (" + ph["mileposts"] + ")"
+    long = ph.melt(
+        id_vars=["label"],
+        value_vars=["elk_crashes", "deer_crashes"],
+        var_name="Animal",
+        value_name="Crashes",
+    )
+    long["Animal"] = long["Animal"].map({"elk_crashes": "Elk", "deer_crashes": "Mule deer"})
+    fig5 = px.bar(long, x="label", y="Crashes", color="Animal", labels={"label": ""})
+    fig5.update_layout(bargap=0.4)
+    st.plotly_chart(fig5)
+
+    st.subheader("Crashes per mile in each phase")
+    fig6 = px.bar(
+        ph,
+        x="label",
+        y="crashes_per_mile",
+        text_auto=".1f",
+        labels={"label": "", "crashes_per_mile": "Reported crashes per mile, 2008 to 2021"},
+    )
+    fig6.update_layout(bargap=0.5)
+    st.plotly_chart(fig6)
+    st.caption(
+        f"Total: {int(ph.total_crashes.sum())} crashes over {ph.miles.sum():.2f} miles "
+        f"({int(ph.elk_crashes.sum())} elk, {int(ph.deer_crashes.sum())} mule deer). "
+        "Crashes per mile are close to even across the four phases, about 24 to 27 per mile, "
+        "so the whole stretch is a hotspot and not one single spot."
+    )
+
+    st.subheader("Planned wildlife crossings (from the scoping report)")
+    st.dataframe(structures, hide_index=True)
+    st.caption(
+        "Phase 5 is optional in the report. NMDOT notes it is a low crossing-activity area "
+        "and an overpass there may not be very effective."
+    )
+
+    st.info(
+        "Read this carefully: (1) These counts only include crashes with elk and mule deer. "
+        "Other animals were left out of the report's tables. "
+        "(2) They are reported crashes only. The report says many wildlife crashes are never "
+        "reported and the real number on US 550 could be much higher. "
+        "(3) The report's introduction says 208 wildlife crashes from 2009 to 2022, while its "
+        "tables say 399 elk and deer crashes from 2008 to 2021. The report does not explain "
+        "the difference in what I read, so each number is labeled with its own years here. "
+        "(4) This corridor is north and west of Cuba village, so these crashes are not in the "
+        "village numbers on the other tabs."
+    )
+
 
 # ---------- Tab 3: About the data ----------
 with tab3:
@@ -276,12 +352,15 @@ with tab3:
         "- UNM-GPS Community Crash Reports (NMDOT crash database): "
         "https://gps.unm.edu/tru/reports/community-reports/index.html\n"
         "- NMDOT US 550 Wildlife Crossing Project: "
-        "https://www.dot.nm.gov/projects/active-projects/us550wildlifeproject/"
+        "https://www.dot.nm.gov/projects/active-projects/us550wildlifeproject/\n"
+        "- NMDOT, US-550 MP 64.93 to MP 80.64 WVC Mitigation Scoping Report, July 2023 "
+        "(crash counts by phase and planned crossing locations), linked from the project page above."
     )
     st.subheader("Limitations")
     st.markdown(
         "- Cuba numbers cover the village only, not US 550 north of town.\n"
         "- Counts are small, so trends can change with one or two crashes.\n"
         "- The data covers reported crashes with a death, an injury, or at least $500 in damage.\n"
-        "- The data does not give crash locations, so it cannot be mapped by milepost."
+        "- The UNM data does not give crash locations, so the Cuba and county charts cannot be "
+        "mapped by milepost. The US 550 tab uses the scoping report's counts by phase instead."
     )
