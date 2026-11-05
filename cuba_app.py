@@ -286,16 +286,6 @@ with tab2:
         "rural versus urban driving. The data does not say which road each crash was on."
     )
 
-    st.subheader("Cuba village by animal type")
-    st.markdown(
-        "The UNM table that splits animal crashes by type only covers one year in the file "
-        "I used, 2025. In 2025 Cuba had 1 animal crash, and it involved **elk**. Two people "
-        "were in it, with no apparent injuries. Every other animal type was zero. "
-        "One crash is too few to draw a conclusion, so the elk and deer breakdown on the "
-        "next tab, which covers the US 550 hotspot north of Cuba, is the better source "
-        "for animal types."
-    )
-
 
 # ---------- Tab: US 550 wildlife corridor ----------
 with tab_us550:
@@ -354,10 +344,6 @@ with tab_us550:
 
     st.subheader("Planned wildlife crossings (from the scoping report)")
     st.dataframe(structures, hide_index=True)
-    st.caption(
-        "Seven crossings in four phases. The report also lists one optional overpass "
-        "(Phase 5) near NM-96, which is left out here."
-    )
 
     st.info(
         "Read this carefully: (1) These counts only include crashes with elk and mule deer. "
