@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-DATA = Path(__file__).parent / "data"
+DATA = Path(__file__).parent / "Data"
 
 st.set_page_config(page_title="Project Cuba Corridor", layout="wide")
 st.title("Project Cuba Corridor")
