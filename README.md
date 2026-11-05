@@ -10,4 +10,8 @@ yurrrrr
 linksss and stuf 
 
 ### Team Contributions
-names and 
+Brayan Calles
+Tysean Austin
+Deaven Montano
+Tyler Rhodes
+Elian Sanchez
