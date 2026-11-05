@@ -1,0 +1,5 @@
+phase,mileposts,miles,deer_crashes,elk_crashes,total_crashes,crashes_per_mile
+Phase 1,MP 64.93 to 69.14,4.21,42,73,115,27.3
+Phase 2,MP 69.14 to 72.98,3.84,38,60,98,25.5
+Phase 3,MP 72.98 to 75.62,2.64,33,31,64,24.2
+Phase 4,MP 75.62 to 80.64,5.02,52,70,122,24.3
