@@ -1,0 +1,8 @@
+structure,type,milepost,phase
+WC-01,Overpass,65.97,Phase 1
+WC-04,Underpass,67.55,Phase 1
+WC-07,Overpass,70.28,Phase 2
+WC-08,Underpass,71.81,Phase 2
+WC-10,Underpass,72.99,Phase 3
+WC-12,Underpass,74.85,Phase 3
+WC-16,Overpass,76.98,Phase 4
