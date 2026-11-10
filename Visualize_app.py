@@ -45,7 +45,25 @@ def fetch_census_acs_data(api_key=""):
     # B25044_003E: Owner-Occupied Zero Vehicles
     # B25044_010E: Renter-Occupied Zero Vehicles
     variables = "NAME,B19013_001E,B08303_001E,B08301_001E,B25044_001E,B25044_003E,B25044_010E"
-    url = f"https://api.census.gov/data/2022/acs/acs5?get={variables}&in=state:{state_fips}&in=county:{county_fips}&for=tract:*"
+    # FIXED URL STRUCTURE:
+url = f"https://api.census.gov/data/2022/acs/acs5?get={variables}&for=tract:*&in=state:{state_fips}%20county:{county_fips}"
+
+if api_key:
+    url += f"&key={api_key}"
+
+try:
+    response = requests.get(url, timeout=10)
+    # Check if the API request returned a successful status code
+    if response.status_code == 200:
+        raw_data = response.json()
+        df = pd.DataFrame(raw_data[1:], columns=raw_data[0])
+        # ... rest of your parsing code ...
+    else:
+        st.error(
+            f"Census API Error Code {response.status_code}: {response.text}"
+        )
+except Exception as e:
+    st.error(f"Failed to fetch Census API data: {e}")
 
     if api_key:
         url += f"&key={api_key}"
