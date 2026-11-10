@@ -1,5 +1,7 @@
+import geopandas as gpd
 import numpy as np
 import pandas as pd
+import pydeck as pdk
 import requests
 import streamlit as st
 
@@ -10,8 +12,8 @@ st.set_page_config(
 
 st.title("🗺️ Spatial Equity & Safety Dashboard: Cuba vs. Sandoval County")
 st.markdown("""
-This application combines **U.S. Census Bureau ACS data** with transportation equity variables 
-(household income, vehicle access, aggregate commute times) to locate where safety risks and community needs overlap.
+This application merges **U.S. Census Bureau ACS data** with an interactive 3D PyDeck map 
+to evaluate commute times, vehicle accessibility, household income, and high-vulnerability census tracts across Sandoval County & Cuba, NM.
 """)
 
 # Sidebar Controls
@@ -21,15 +23,27 @@ census_api_key = st.sidebar.text_input(
     type="password",
     help="Optional key for higher Census API rate limits.",
 )
+
 income_threshold = st.sidebar.slider(
-    "Filter Low Household Income (< $)", 20000, 100000, 45000
+    "Filter Low Household Income (< $)", 20000, 100000, 50000
 )
 min_commute_time = st.sidebar.slider(
-    "Filter High Commute Time (> mins)", 15, 60, 30
+    "Filter High Commute Time (> mins)", 10, 60, 20
+)
+
+st.sidebar.header("Map Layer Settings")
+map_metric = st.sidebar.selectbox(
+    "Select Metric for 3D Map Height & Color:",
+    [
+        "Vulnerability_Index",
+        "Median_Income",
+        "Avg_Commute_Mins",
+        "Zero_Vehicle_Pct",
+    ],
 )
 
 
-# Fetch Data from U.S. Census Bureau API with robust error handling and headers
+# Fetch Census ACS Demographics
 @st.cache_data
 def fetch_census_acs_data(api_key=""):
   state_fips = "35"  # New Mexico
@@ -45,130 +59,182 @@ def fetch_census_acs_data(api_key=""):
 
   try:
     response = requests.get(url, headers=headers, timeout=15)
+    if response.status_code == 200:
+      raw_data = response.json()
+      df = pd.DataFrame(raw_data[1:], columns=raw_data[0])
 
-    if response.status_code != 200:
-      st.error(
-          f"Census API returned status code {response.status_code}. Response:"
-          f" {response.text[:200]}"
+      numeric_cols = [
+          "B19013_001E",
+          "B08303_001E",
+          "B08301_001E",
+          "B25044_001E",
+          "B25044_003E",
+          "B25044_010E",
+      ]
+      for col in numeric_cols:
+        if col in df.columns:
+          df[col] = pd.to_numeric(df[col], errors="coerce")
+          df[col] = df[col].apply(lambda x: np.nan if x <= 0 else x)
+
+      df["GEOID"] = df["state"] + df["county"] + df["tract"]
+      df["Median_Income"] = df["B19013_001E"]
+
+      # Calculate Average Commute Time per worker
+      df["Avg_Commute_Mins"] = np.where(
+          (df["B08301_001E"] > 0) & (df["B08303_001E"] > 0),
+          df["B08303_001E"] / df["B08301_001E"],
+          np.nan,
       )
-      return pd.DataFrame()
 
-    raw_data = response.json()
-    if len(raw_data) < 2:
-      st.warning("Census API returned empty data rows.")
-      return pd.DataFrame()
+      df["Zero_Vehicle_Pct"] = np.where(
+          df["B25044_001E"] > 0,
+          (df["B25044_003E"].fillna(0) + df["B25044_010E"].fillna(0))
+          / df["B25044_001E"]
+          * 100,
+          np.nan,
+      )
 
-    df = pd.DataFrame(raw_data[1:], columns=raw_data[0])
-
-    numeric_cols = [
-        "B19013_001E",
-        "B08303_001E",
-        "B08301_001E",
-        "B25044_001E",
-        "B25044_003E",
-        "B25044_010E",
-    ]
-    for col in numeric_cols:
-      if col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-        # Replace Census missing/suppressed sentinel values with NaN
-        df[col] = df[col].apply(lambda x: np.nan if x <= 0 else x)
-
-    df["GEOID"] = df["state"] + df["county"] + df["tract"]
-    df["Median_Income"] = df["B19013_001E"]
-    df["Avg_Commute_Mins"] = np.where(
-        df["B08301_001E"] > 0, df["B08303_001E"] / df["B08301_001E"], np.nan
-    )
-    df["Zero_Vehicle_Pct"] = np.where(
-        df["B25044_001E"] > 0,
-        (df["B25044_003E"] + df["B25044_010E"]) / df["B25044_001E"] * 100,
-        np.nan,
-    )
-
-    return df
-
+      return df
   except Exception as e:
-    st.error(f"Error connecting to Census API: {e}")
-    return pd.DataFrame()
+    st.error(f"Error fetching Census data: {e}")
+  return pd.DataFrame()
+
+
+# Fetch Spatial Boundaries (GeoJSON) from US Census TIGERweb
+@st.cache_data
+def fetch_census_geometries():
+  geojson_url = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/4/query?where=STATE%3D35+AND+COUNTY%3D043&outFields=GEOID,NAME&outSR=4326&f=geojson"
+  try:
+    gdf = gpd.read_file(geojson_url)
+    return gdf
+  except Exception as e:
+    st.error(f"Error fetching spatial boundaries: {e}")
+    return gpd.GeoDataFrame()
 
 
 df = fetch_census_acs_data(census_api_key)
+gdf_tracts = fetch_census_geometries()
 
-if not df.empty:
-  # Summary Metrics
-  st.header("1. Socioeconomic & Commute Metrics")
-  m1, m2, m3 = st.columns(3)
+if not df.empty and not gdf_tracts.empty:
+  # Join demographic data with boundaries
+  gdf_merged = gdf_tracts.merge(df, on="GEOID", how="inner")
 
-  avg_inc = df["Median_Income"].mean()
-  avg_comm = df["Avg_Commute_Mins"].mean()
-  avg_veh = df["Zero_Vehicle_Pct"].mean()
+  # Calculate Vulnerability Index Score (0-100)
+  max_inc = gdf_merged["Median_Income"].max()
+  max_comm = gdf_merged["Avg_Commute_Mins"].max()
+  max_veh = gdf_merged["Zero_Vehicle_Pct"].max()
 
-  m1.metric(
-      "County Avg Income", f"${avg_inc:,.0f}" if not pd.isna(avg_inc) else "N/A"
+  gdf_merged["Income_Need"] = (
+      1 - (gdf_merged["Median_Income"] / max_inc) if max_inc > 0 else 0
   )
+  gdf_merged["Commute_Need"] = (
+      gdf_merged["Avg_Commute_Mins"] / max_comm if max_comm > 0 else 0
+  )
+  gdf_merged["Vehicle_Need"] = (
+      gdf_merged["Zero_Vehicle_Pct"] / max_veh if max_veh > 0 else 0
+  )
+
+  gdf_merged["Vulnerability_Index"] = (
+      gdf_merged[["Income_Need", "Commute_Need", "Vehicle_Need"]].mean(axis=1)
+      * 100
+  ).round(1)
+
+  # 1. Summary Metrics Display
+  st.header("1. Socioeconomic & Commute Metrics")
+  m1, m2, m3, m4 = st.columns(4)
+
+  m1.metric("County Avg Income", f"${gdf_merged['Median_Income'].mean():,.0f}")
   m2.metric(
-      "County Avg Commute",
-      f"{avg_comm:.1f} mins" if not pd.isna(avg_comm) else "N/A",
+      "County Avg Commute", f"{gdf_merged['Avg_Commute_Mins'].mean():.1f} mins"
   )
   m3.metric(
       "Zero-Vehicle Households",
-      f"{avg_veh:.1f}%" if not pd.isna(avg_veh) else "N/A",
+      f"{gdf_merged['Zero_Vehicle_Pct'].mean():.1f}%",
+  )
+  m4.metric("Total Tracts Analyzed", len(gdf_merged))
+
+  # 2. PyDeck 3D Map Visualization
+  st.header("2. Interactive Geospatial PyDeck Visualization")
+
+  selected_max = (
+      gdf_merged[map_metric].max() if gdf_merged[map_metric].max() > 0 else 1
   )
 
-  # Composite Index Calculation
-  st.header("2. Overlap & Priority Vulnerability Index")
+  # Dynamic RGBA color generation (Yellow to Red)
+  def calculate_color(row):
+    val = row[map_metric]
+    if pd.isna(val):
+      return [200, 200, 200, 100]
+    ratio = min(max(val / selected_max, 0), 1)
+    return [int(255 * ratio), int(255 * (1 - ratio)), 50, 180]
 
-  max_inc = df["Median_Income"].max()
-  max_comm = df["Avg_Commute_Mins"].max()
-  max_veh = df["Zero_Vehicle_Pct"].max()
+  gdf_merged["color"] = gdf_merged.apply(calculate_color, axis=1)
+  gdf_merged["elevation"] = (
+      gdf_merged[map_metric].fillna(0) / selected_max
+  ) * 5000
 
-  df["Income_Need"] = (
-      1 - (df["Median_Income"] / max_inc) if max_inc > 0 else np.nan
-  )
-  df["Commute_Need"] = (
-      df["Avg_Commute_Mins"] / max_comm if max_comm > 0 else np.nan
-  )
-  df["Vehicle_Need"] = (
-      df["Zero_Vehicle_Pct"] / max_veh if max_veh > 0 else np.nan
+  layer_tracts = pdk.Layer(
+      "GeoJsonLayer",
+      gdf_merged,
+      opacity=0.7,
+      stroked=True,
+      filled=True,
+      extruded=True,
+      wireframe=True,
+      get_elevation="elevation",
+      get_fill_color="color",
+      get_line_color=[255, 255, 255, 200],
+      line_width_min_pixels=1,
+      pickable=True,
   )
 
-  df["Vulnerability_Index"] = (
-      df[["Income_Need", "Commute_Need", "Vehicle_Need"]].mean(axis=1) * 100
+  view_state = pdk.ViewState(
+      latitude=35.60, longitude=-106.90, zoom=8.5, pitch=45, bearing=15
   )
 
-  priority_tracts = df[
-      (df["Median_Income"] < income_threshold)
-      & (df["Avg_Commute_Mins"] > min_commute_time)
+  r = pdk.Deck(
+      layers=[layer_tracts],
+      initial_view_state=view_state,
+      tooltip={
+          "html": """
+                <b>Tract Name:</b> {NAME_x}<br/>
+                <b>GEOID:</b> {GEOID}<br/>
+                <b>Median Income:</b> ${Median_Income}<br/>
+                <b>Avg Commute:</b> {Avg_Commute_Mins} mins<br/>
+                <b>Zero-Vehicle %:</b> {Zero_Vehicle_Pct}%<br/>
+                <b>Vulnerability Score:</b> {Vulnerability_Index} / 100
+            """,
+          "style": {"backgroundColor": "navy", "color": "white"},
+      },
+  )
+
+  st.pydeck_chart(r)
+
+  # 3. Filtered Priority Table
+  st.header("3. Overlap Priority Intervention Zones")
+  priority_tracts = gdf_merged[
+      (gdf_merged["Median_Income"] <= income_threshold)
+      | (gdf_merged["Avg_Commute_Mins"] >= min_commute_time)
   ].sort_values(by="Vulnerability_Index", ascending=False)
 
-  st.subheader("Priority Areas Requiring Safety & Transit Investment")
-  if not priority_tracts.empty:
-    st.dataframe(
-        priority_tracts[[
-            "GEOID",
-            "NAME",
-            "Median_Income",
-            "Avg_Commute_Mins",
-            "Zero_Vehicle_Pct",
-            "Vulnerability_Index",
-        ]],
-        use_container_width=True,
-    )
-  else:
-    st.info(
-        "No tracts match the current filter thresholds. Try adjusting the"
-        " sliders in the sidebar."
-    )
+  st.subheader(f"Matching Census Tracts (Found {len(priority_tracts)})")
+  st.dataframe(
+      pd.DataFrame(
+          priority_tracts[[
+              "GEOID",
+              "NAME_x",
+              "Median_Income",
+              "Avg_Commute_Mins",
+              "Zero_Vehicle_Pct",
+              "Vulnerability_Index",
+          ]]
+      ).rename(columns={"NAME_x": "Tract Name"}),
+      use_container_width=True,
+  )
 
-  st.header("3. Targeted Recommendations")
-  st.markdown("""
-    - **Transit Infrastructure:** Launch micro-transit/demand-response shuttles in tracts with high zero-vehicle percentages.
-    - **Active Transportation:** Install sidewalks, street lighting, and protected bike lanes along major thoroughfares connecting Cuba to broader county transit networks.
-    - **Speed & Traffic Calming:** Prioritize speed reduction measures along corridors with high pedestrian traffic and long rural commute dependencies.
-    """)
 else:
   st.warning(
-      "⚠️ No data could be loaded from the Census API endpoint. Please check"
-      " your network or add a Census API key in the sidebar."
+      "⚠️ Data could not be loaded. Please check network access or provide a"
+      " Census API key."
   )
     
