@@ -1,4 +1,3 @@
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 import requests
@@ -45,25 +44,9 @@ def fetch_census_acs_data(api_key=""):
     # B25044_003E: Owner-Occupied Zero Vehicles
     # B25044_010E: Renter-Occupied Zero Vehicles
     variables = "NAME,B19013_001E,B08303_001E,B08301_001E,B25044_001E,B25044_003E,B25044_010E"
-    # FIXED URL STRUCTURE:
-url = f"https://api.census.gov/data/2022/acs/acs5?get={variables}&for=tract:*&in=state:{state_fips}%20county:{county_fips}"
 
-if api_key:
-    url += f"&key={api_key}"
-
-try:
-    response = requests.get(url, timeout=10)
-    # Check if the API request returned a successful status code
-    if response.status_code == 200:
-        raw_data = response.json()
-        df = pd.DataFrame(raw_data[1:], columns=raw_data[0])
-        # ... rest of your parsing code ...
-    else:
-        st.error(
-            f"Census API Error Code {response.status_code}: {response.text}"
-        )
-except Exception as e:
-    st.error(f"Failed to fetch Census API data: {e}")
+    # FIXED URL: Correct Census API hierarchy format for county tracts
+    url = f"https://api.census.gov/data/2022/acs/acs5?get={variables}&for=tract:*&in=state:{state_fips}%20county:{county_fips}"
 
     if api_key:
         url += f"&key={api_key}"
@@ -101,6 +84,10 @@ except Exception as e:
             )
 
             return df
+        else:
+            st.error(
+                f"Census API Error Code {response.status_code}: {response.text}"
+            )
     except Exception as e:
         st.error(f"Error fetching Census data: {e}")
     return pd.DataFrame()
@@ -122,8 +109,8 @@ if not df.empty:
 
     # Normalization (0-1 scale)
     df["Income_Need"] = 1 - (df["Median_Income"] / df["Median_Income"].max())
-    df["Commute_Need"] = df["Avg_Commute_Mins"] / df["Avg_Commute_Mins"].max()
-    df["Vehicle_Need"] = df["Zero_Vehicle_Pct"] / df["Zero_Vehicle_Pct"].max()
+    df["Commute_Need"] = df["Avg_Commute_Mins"] / df["Avg_Commute_Mins'].max()
+    df["Vehicle_Need"] = df["Zero_Vehicle_Pct"] / df["Zero_Vehicle_Pct'].max()
 
     # Composite score
     df["Vulnerability_Index"] = (
@@ -165,3 +152,4 @@ if not df.empty:
     """)
 else:
     st.info("Unable to retrieve Census data. Verify your network or API settings.")
+    
