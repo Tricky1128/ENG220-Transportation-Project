@@ -102,20 +102,29 @@ def fetch_census_acs_data(api_key=""):
 
 # Fetch Spatial Boundaries (GeoJSON) from US Census TIGERweb
 @st.cache_data
+# Fetch Tract Boundaries (GeoJSON) safely using requests
+@st.cache_data
 def fetch_census_geometries():
   geojson_url = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/4/query?where=STATE%3D35+AND+COUNTY%3D043&outFields=GEOID,NAME&outSR=4326&f=geojson"
+  headers = {"User-Agent": "Mozilla/5.0"}
   try:
-    gdf = gpd.read_file(geojson_url)
-    return gdf
+    response = requests.get(geojson_url, headers=headers, timeout=15)
+    if response.status_code == 200:
+      data = response.json()
+      gdf = gpd.GeoDataFrame.from_features(data["features"])
+      # Ensure coordinate reference system (CRS) is standard WGS84
+      gdf.set_crs(epsg=4326, inplace=True)
+      return gdf
+    else:
+      st.error(
+          f"Error fetching boundaries (HTTP {response.status_code}):"
+          f" {response.text[:200]}"
+      )
+      return gpd.GeoDataFrame()
   except Exception as e:
-    st.error(f"Error fetching spatial boundaries: {e}")
+    st.error(f"Error parsing spatial tract boundaries: {e}")
     return gpd.GeoDataFrame()
 
-
-df = fetch_census_acs_data(census_api_key)
-gdf_tracts = fetch_census_geometries()
-
-if not df.empty and not gdf_tracts.empty:
   # Join demographic data with boundaries
   gdf_merged = gdf_tracts.merge(df, on="GEOID", how="inner")
 
