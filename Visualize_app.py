@@ -155,5 +155,133 @@ if not df.empty:
       else 0
   )
   gdf_merged["Vehicle_Need"] = (
+      gdf_merged["Zero_Vehicle_Pct"] / max_veh
+      if max_veh and max_veh > 0
+      else 0
+  )
 
+  gdf_merged["Vulnerability_Index"] = (
+      gdf_merged[["Income_Need", "Commute_Need", "Vehicle_Need"]].mean(axis=1)
+      * 100
+  ).round(1)
+
+  # 1. Summary Metrics Display
+  st.header("1. Socioeconomic & Commute Metrics")
+  m1, m2, m3, m4 = st.columns(4)
+
+  m1.metric(
+      "County Avg Income",
+      (
+          f"${gdf_merged['Median_Income'].mean():,.0f}"
+          if not pd.isna(gdf_merged["Median_Income"].mean())
+          else "N/A"
+      ),
+  )
+  m2.metric(
+      "County Avg Commute",
+      (
+          f"{gdf_merged['Avg_Commute_Mins'].mean():.1f} mins"
+          if not pd.isna(gdf_merged["Avg_Commute_Mins"].mean())
+          else "N/A"
+      ),
+  )
+  m3.metric(
+      "Zero-Vehicle Households",
+      (
+          f"{gdf_merged['Zero_Vehicle_Pct'].mean():.1f}%"
+          if not pd.isna(gdf_merged["Zero_Vehicle_Pct"].mean())
+          else "N/A"
+      ),
+  )
+  m4.metric("Total Tracts Analyzed", len(gdf_merged))
+
+  # 2. PyDeck 3D Map Visualization (Only if boundaries loaded successfully)
+  st.header("2. Interactive Geospatial PyDeck Visualization")
+  if not gdf_tracts.empty and "geometry" in gdf_merged:
+    selected_max = (
+        gdf_merged[map_metric].max() if gdf_merged[map_metric].max() > 0 else 1
+    )
+
+    def calculate_color(row):
+      val = row[map_metric]
+      if pd.isna(val):
+        return [200, 200, 200, 100]
+      ratio = min(max(val / selected_max, 0), 1)
+      return [int(255 * ratio), int(255 * (1 - ratio)), 50, 180]
+
+    gdf_merged["color"] = gdf_merged.apply(calculate_color, axis=1)
+    gdf_merged["elevation"] = (
+        gdf_merged[map_metric].fillna(0) / selected_max
+    ) * 5000
+
+    layer_tracts = pdk.Layer(
+        "GeoJsonLayer",
+        gdf_merged,
+        opacity=0.7,
+        stroked=True,
+        filled=True,
+        extruded=True,
+        wireframe=True,
+        get_elevation="elevation",
+        get_fill_color="color",
+        get_line_color=[255, 255, 255, 200],
+        line_width_min_pixels=1,
+        pickable=True,
+    )
+
+    view_state = pdk.ViewState(
+        latitude=35.60, longitude=-106.90, zoom=8.5, pitch=45, bearing=15
+    )
+
+    name_col = "NAME_x" if "NAME_x" in gdf_merged else "NAME"
+    r = pdk.Deck(
+        layers=[layer_tracts],
+        initial_view_state=view_state,
+        tooltip={
+            "html": f"""
+                    <b>Tract Name:</b> {{{name_col}}}<br/>
+                    <b>GEOID:</b> {{GEOID}}<br/>
+                    <b>Median Income:</b> ${{Median_Income}}<br/>
+                    <b>Avg Commute:</b> {{Avg_Commute_Mins}} mins<br/>
+                    <b>Zero-Vehicle %:</b> {{Zero_Vehicle_Pct}}%<br/>
+                    <b>Vulnerability Score:</b> {{Vulnerability_Index}} / 100
+                """,
+            "style": {"backgroundColor": "navy", "color": "white"},
+        },
+    )
+    st.pydeck_chart(r)
+  else:
+    st.info(
+        "Map boundaries temporarily unavailable; displaying tabular data"
+        " analysis below."
+    )
+
+  # 3. Filtered Priority Table
+  st.header("3. Overlap Priority Intervention Zones")
+  priority_tracts = gdf_merged[
+      (gdf_merged["Median_Income"] <= income_threshold)
+      | (gdf_merged["Avg_Commute_Mins"] >= min_commute_time)
+  ].sort_values(by="Vulnerability_Index", ascending=False)
+
+  st.subheader(f"Matching Census Tracts (Found {len(priority_tracts)})")
+
+  name_col_table = "NAME_x" if "NAME_x" in priority_tracts else "NAME"
+  display_df = pd.DataFrame(
+      priority_tracts[[
+          "GEOID",
+          name_col_table,
+          "Median_Income",
+          "Avg_Commute_Mins",
+          "Zero_Vehicle_Pct",
+          "Vulnerability_Index",
+      ]]
+  ).rename(columns={name_col_table: "Tract Name"})
+
+  st.dataframe(display_df, use_container_width=True)
+
+else:
+  st.warning(
+      "⚠️ Data could not be loaded from the Census API. Please provide a"
+      " Census API key in the sidebar."
+  )
     
