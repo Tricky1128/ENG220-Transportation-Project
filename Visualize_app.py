@@ -1,3 +1,4 @@
+import json
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -100,9 +101,7 @@ def fetch_census_acs_data(api_key=""):
   return pd.DataFrame()
 
 
-# Fetch Spatial Boundaries (GeoJSON) from US Census TIGERweb
-@st.cache_data
-# Fetch Tract Boundaries (GeoJSON) safely using requests
+# Fetch Spatial Boundaries safely using requests & GeoDataFrame.from_features
 @st.cache_data
 def fetch_census_geometries():
   geojson_url = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/4/query?where=STATE%3D35+AND+COUNTY%3D043&outFields=GEOID,NAME&outSR=4326&f=geojson"
@@ -112,7 +111,6 @@ def fetch_census_geometries():
     if response.status_code == 200:
       data = response.json()
       gdf = gpd.GeoDataFrame.from_features(data["features"])
-      # Ensure coordinate reference system (CRS) is standard WGS84
       gdf.set_crs(epsg=4326, inplace=True)
       return gdf
     else:
@@ -125,6 +123,11 @@ def fetch_census_geometries():
     st.error(f"Error parsing spatial tract boundaries: {e}")
     return gpd.GeoDataFrame()
 
+
+df = fetch_census_acs_data(census_api_key)
+gdf_tracts = fetch_census_geometries()
+
+if not df.empty and not gdf_tracts.empty:
   # Join demographic data with boundaries
   gdf_merged = gdf_tracts.merge(df, on="GEOID", how="inner")
 
@@ -169,13 +172,14 @@ def fetch_census_geometries():
       gdf_merged[map_metric].max() if gdf_merged[map_metric].max() > 0 else 1
   )
 
-  # Dynamic RGBA color generation (Yellow to Red)
+
   def calculate_color(row):
     val = row[map_metric]
     if pd.isna(val):
       return [200, 200, 200, 100]
     ratio = min(max(val / selected_max, 0), 1)
     return [int(255 * ratio), int(255 * (1 - ratio)), 50, 180]
+
 
   gdf_merged["color"] = gdf_merged.apply(calculate_color, axis=1)
   gdf_merged["elevation"] = (
